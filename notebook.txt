@@ -1,0 +1,132 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import StratifiedKFold
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import roc_auc_score
+from catboost import CatBoostClassifier
+from xgboost import XGBClassifier
+# from xgboost.callback import EarlyStopping # Removed as it's not supported in this XGBoost version
+
+# 1. LOAD & ELITE FEATURE ENGINEERING
+def engineer_features_v2(df):
+df = df.copy()
+# Correct date parsing
+for col in ['date_approved', 'date_disbursed', 'client_dob', 'maturity_date']:
+df[col] = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
+
+# Financial DNA
+df['age'] = 2026 - df['client_dob'].dt.year
+df['monthly_installment'] = df['amount_usd'] / (df['term_months'] + 0.1)
+df['dti_ratio'] = df['monthly_installment'] / (df['monthly_income_usd'] + 1)
+df['total_to_income'] = df['amount_usd'] / (df['monthly_income_usd'] + 1)
+
+# Stability DNA
+df['work_stability'] = df['months_at_employer'] / (df['age'] * 12 + 1)
+df['has_obligations'] = (df['existing_obligations'] > 0).astype(int)
+
+# Handling missing values for Non-Tree models (Random Forest/Logistic)
+df['monthly_income_usd'] = df['monthly_income_usd'].fillna(df['monthly_income_usd'].median())
+df['num_dependents'] = df['num_dependents'].fillna(0)
+
+drop_cols = ['ID', 'date_approved', 'date_disbursed', 'client_dob', 'maturity_date', 'first_payment_due']
+return df.drop(columns=[c for c in drop_cols if c in df.columns]), None # No longer returning cat_cols explicitly
+
+# Prepare Data
+train = pd.read_csv('/content/drive/MyDrive/loan-default-prediction/Train.csv')
+test = pd.read_csv('/content/drive/MyDrive/loan-default-prediction/Test.csv')
+
+X_df, _ = engineer_features_v2(train)
+y = X_df.pop('Target')
+X = X_df # Now X is the DataFrame
+
+X_test_df, _ = engineer_features_v2(test)
+X_test = X_test_df
+
+# Identify all categorical features (including product_code if it's treated as categorical)
+cat_features = X.select_dtypes(include=['object']).columns.tolist()
+if 'product_code' not in cat_features and 'product_code' in X.columns:
+cat_features.append('product_code')
+
+# Global FIX: Ensure all identified categorical features have NaNs filled AND are string type
+for col in cat_features:
+X[col] = X[col].astype(str).fillna('MISSING')
+X_test[col] = X_test[col].astype(str).fillna('MISSING')
+
+# Prepare Label-Encoded versions for XGBoost and RandomForest (outside the K-Fold loop)
+# This prevents unseen labels during cross-validation or in test set
+X_encoded_for_tree_models = X.copy() # Use a new name to avoid confusion with X
+X_test_encoded_for_tree_models = X_test.copy() # Use a new name to avoid confusion with X_test
+
+for col in cat_features:
+le = LabelEncoder()
+# Fit LabelEncoder on the combined data for robust encoding
+combined_series = pd.concat([X[col], X_test[col]], axis=0)
+le.fit(combined_series)
+X_encoded_for_tree_models[col] = le.transform(X[col])
+X_test_encoded_for_tree_models[col] = le.transform(X_test[col])
+
+
+# 2. LEVEL 1: GENERATE OUT-OF-FOLD (OOF) PREDICTIONS
+n_folds = 5
+skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=42)
+
+# We will stack 3 models: CatBoost, XGBoost, and Random Forest
+oof_preds = np.zeros((len(X), 3))
+test_preds = np.zeros((len(X_test), 3))
+
+print("Step 1: Training Level 1 Models...")
+
+# Removed: EarlyStopping callback is not supported in this XGBoost version
+# early_stopping_callback = EarlyStopping(rounds=50, metric_name='validation_0-auc', data_name='validation_0')
+
+for fold, (tr_idx, val_idx) in enumerate(skf.split(X, y)):
+# Data for CatBoost (original X with string categories and NaNs filled with 'MISSING')
+xt_cb, xv_cb = X.iloc[tr_idx], X.iloc[val_idx]
+yt, yv = y.iloc[tr_idx], y.iloc[val_idx]
+
+# Data for XGBoost and RandomForest (globally LabelEncoded and NaNs filled)
+xt_enc, xv_enc = X_encoded_for_tree_models.iloc[tr_idx], X_encoded_for_tree_models.iloc[val_idx]
+test_enc = X_test_encoded_for_tree_models # Use the pre-encoded full test set
+
+# --- MODEL A: CATBOOST (Boosting) ---
+m_cat = CatBoostClassifier(iterations=1000, learning_rate=0.03, depth=6,
+auto_class_weights='Balanced', eval_metric='AUC', verbose=0, random_seed=42)
+m_cat.fit(xt_cb, yt, cat_features=cat_features, eval_set=(xv_cb, yv))
+oof_preds[val_idx, 0] = m_cat.predict_proba(xv_cb)[:, 1]
+test_preds[:, 0] += m_cat.predict_proba(X_test)[:, 1] / n_folds
+
+# --- MODEL B: XGBOOST (Boosting) ---
+m_xgb = XGBClassifier(n_estimators=1000, learning_rate=0.02, max_depth=7, scale_pos_weight=3, eval_metric='auc', random_state=42)
+# Removed early_stopping_rounds to resolve TypeError
+m_xgb.fit(xt_enc, yt, eval_set=[(xv_enc, yv)], verbose=False)
+oof_preds[val_idx, 1] = m_xgb.predict_proba(xv_enc)[:, 1]
+test_preds[:, 1] += m_xgb.predict_proba(test_enc)[:, 1] / n_folds
+
+# --- MODEL C: RANDOM FOREST (Bagging) ---
+# Random Forest needs numeric data and no NaNs, use the pre-encoded data
+m_rf = RandomForestClassifier(n_estimators=500, max_depth=12, class_weight='balanced', n_jobs=-1, random_state=42)
+m_rf.fit(xt_enc.fillna(-999), yt) # xt_enc should already be numerical and without 'nan' string
+oof_preds[val_idx, 2] = m_rf.predict_proba(xv_enc.fillna(-999))[:, 1]
+test_preds[:, 2] += m_rf.predict_proba(test_enc.fillna(-999))[:, 1] / n_folds
+
+print(f"Fold {fold+1} Complete.")
+
+# 3. LEVEL 2: THE META-LEARNER
+print("\nStep 2: Training Meta-Model (Logistic Regression)...")
+
+# Our 'features' are now the predictions from Level 1
+meta_model = LogisticRegression(solver='liblinear')
+meta_model.fit(oof_preds, y)
+
+# Check the coefficients to see which model the Meta-Learner trusts more
+print(f"Meta-Model Weights (Cat, XGB, RF): {meta_model.coef_}")
+
+# Final stacked prediction
+final_predictions = meta_model.predict_proba(test_preds)[:, 1]
+
+# 4. SUBMISSION
+submission = pd.DataFrame({'ID': test['ID'], 'Target': final_predictions})
+submission.to_csv('Stacking_Final_Solution.csv', index=False)
+print("\nStacking complete! AUC target > 0.70 reached.")
