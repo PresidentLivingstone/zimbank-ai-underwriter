@@ -57,10 +57,14 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 streamlit run zimbank_app.py
 
+Live Project:
+https://zimbank-ai-underwriter.streamlit.app/
+
 Login Credentials
 Demo access: analyst / ZimBank2026 || admin / Admin@2026
 
-Innovative Solution Video Explanation.mov | https://drive.google.com/file/d/1-q8D8QSoEuaNftgX1SR1SIODz5wh4HBT/view?usp=sharing
+Innovative Solution Video Explanation.mov:
+https://drive.google.com/file/d/1-q8D8QSoEuaNftgX1SR1SIODz5wh4HBT/view?usp=sharing
 ```
 
 
