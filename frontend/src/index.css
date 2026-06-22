@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    @apply bg-slate-100;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-2xl border border-slate-200 shadow-sm;
+  }
+
+  .input-field {
+    @apply w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800
+      bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-900
+      focus:border-transparent transition-all duration-150;
+  }
+
+  .input-field-error {
+    @apply border-red-400 bg-red-50 focus:ring-red-300;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 text-white text-sm font-semibold
+      px-5 py-2.5 rounded-xl transition-all duration-150
+      disabled:opacity-50 disabled:cursor-not-allowed;
+    background-color: #1a3a5c;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-color: #14304f;
+  }
+  .btn-primary:active:not(:disabled) {
+    background-color: #0e263f;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 border border-slate-200
+      text-slate-600 text-sm font-medium px-5 py-2.5 rounded-xl
+      hover:bg-slate-50 hover:border-slate-300 transition-all duration-150;
+  }
+
+  .nav-btn {
+    @apply relative flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg
+      transition-all duration-150 text-slate-300;
+  }
+  .nav-btn:hover {
+    color: white;
+    background-color: rgba(255,255,255,0.08);
+  }
+  .nav-btn.active {
+    color: white;
+    background-color: rgba(255,255,255,0.12);
+  }
+}

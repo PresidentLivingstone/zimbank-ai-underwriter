@@ -1,71 +1,172 @@
-# ZimBank AI Credit Risk Underwriting Platform
+# 🏛️ ZimBank AI Credit Risk Underwriting Platform
 
-## Key Features
+An institutional-grade, Basel IV-compliant automated underwriting and credit risk assessment platform tailored for the Southern African (SADC) banking ecosystem. This platform combines a high-performance **FastAPI backend** (SQLite-backed, ensemble ML model predictions) with a premium **Vite + React + TypeScript frontend**.
 
-| Feature | Description |
-|---------|-------------|
-| **Real‑time Scoring** | Evaluate single applicants using a stacking / meta-learner or sklearn pipeline loaded from `models/`. |
-| **Explainable AI** | Component risk scores (DTI, employment, leverage, age, loan‑to‑income) for narrative and committee use. |
-| **Basel IV Reports** | PDF generation with metrics and audit-oriented copy. |
-| **Batch Processing** | Score a full ledger and export CSV / portfolio PDF. |
-| **Regional Focus** | Feature engineering and thresholds tuned for Southern Africa contexts. |
+---
 
-## Risk logic (example policy bands)
+## 📐 Platform Architecture
 
-| Default probability | Risk tier | Decision |
-|---------------------|-----------|----------|
-| Under 35% | Low (A) | Approved (auto pathway) |
-| 35% to 60% | Medium (B) | Under review |
-| Over 60% | High (C) | Declined |
+The platform separates the presentation layer from the core computation, scoring engine, and database store.
 
+```mermaid
+graph TD
+    subgraph Frontend [React / Vite Presentation Layer]
+        UI[Dashboard / Customers / Form / Underwriting]
+        Client[Mock Supabase Wrapper / Fetch client]
+    end
 
-### Platform Capabilities
-    
--  Real-Time Scoring: Instant credit risk assessment using ensemble machine learning
--  Explainable AI: Component-level risk breakdown for full transparency
--  Basel IV Compliance: Institutional-grade reporting for regulators
--  Regional Intelligence: Zimbabwe & Southern Africa lending insights
--  Decision Support: Automated approval/decline/review workflow
--  Audit Trail: Complete documentation for credit committee review
+    subgraph Backend [FastAPI Application Layer]
+        API[FastAPI Router & Endpoints]
+        Scoring[Engineering & ML Prediction Engine]
+        PDF[ReportLab PDF Document Builder]
+        DB_Init[Auto-Migration & Database Initializer]
+    end
 
-###  Use Cases
+    subgraph Storage [Data Storage & Model Assets]
+        SQL[(SQLite - zimbank_app.db)]
+        CSV[(data/sample_test_data.csv)]
+        Model[(models/final_credit_risk_model.joblib)]
+    end
 
-Perfect for:
-- **Financial Institutions**: Automated lending decisions at scale
-- **Fintech Platforms**: Risk assessment API integration
-- **Credit Unions**: Fair, consistent decision-making
-- **Policy Makers**: Financial inclusion data analysis & impact measurement
-
-
-## Tech stack
-
-- **UI** — Streamlit (institutional theme in `zimbank_app.py`)
-- **ML** — scikit-learn, optional CatBoost / XGBoost (via joblib bundles)
-- **PDF** — ReportLab
-- **Data** — pandas, NumPy
-
-
-## Quick start
-
-```bash
-git clone https://github.com/PresidentLivingstone/zimbank-ai-underwriter
-cd zimbank-ai-underwriter
-
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-
-pip install -r requirements.txt
-streamlit run zimbank_app.py
-
-Live Project:
-https://zimbank-ai-underwriter.streamlit.app/
-
-Login Credentials
-Demo access: analyst / ZimBank2026 || admin / Admin@2026
-
-Innovative Solution Video Explanation.mov:
-https://drive.google.com/file/d/1-q8D8QSoEuaNftgX1SR1SIODz5wh4HBT/view?usp=sharing
+    UI --> Client
+    Client -->|REST API Calls| API
+    API --> DB_Init
+    DB_Init -->|Select/Insert| SQL
+    API --> Scoring
+    Scoring -->|Predict Probability| Model
+    API --> PDF
+    DB_Init -->|Auto-seed first 100 rows| CSV
 ```
 
+---
 
+## ⚡ Key Features
 
+*   **⚡ Real-Time Single Applications**: Input applicant data manually to perform immediate feature engineering and credit scoring with risk tiering.
+*   **📊 Dynamic Dashboard Analytics**: Real-time KPI counters (active cases, approval rates, average default probabilities, and pending reviews) dynamically computed from the SQLite database.
+*   **📂 Batch Credit Underwriting**: Drag and drop a credit ledger CSV file to automatically process, score, and view entire customer cohorts in a searchable, paginated table.
+*   **📋 Basel IV Compliant PDF Reports**: Generate structured, institutional credit report PDFs with complete risk breakdowns, credit scoring factors, and automated next-steps workflows.
+*   **🧬 Explainable AI Traceability**: Provides deterministic trace flags for risk components such as debt-to-income (DTI) ratio burden, employment stability, credit leverage, age, and loan-to-income limits.
+*   **🔒 Local Workspace Authentication**: Lightweight local authentication that stores sessions in `localStorage` to allow quick deployment and offline development.
+
+---
+
+## 🛠️ Technology Stack
+
+### Frontend
+*   **Framework**: React 18 with Vite and TypeScript
+*   **Iconography**: Lucide React
+*   **Styling**: Modern Vanilla CSS, responsive layouts, smooth gradients, and glassmorphism.
+*   **Theme**: Premium light-themed left panel with white gradients and refined contrast; dark/light-themed dashboard panels.
+
+### Backend
+*   **Framework**: FastAPI with Uvicorn server
+*   **Database**: SQLite (`zimbank_app.db` with auto-migration/tables schema init)
+*   **ML Libraries**: scikit-learn, pandas, NumPy, joblib (automatic fallback to simulation if specific model binaries are not present)
+*   **PDF Engine**: ReportLab (dynamic document builder)
+
+---
+
+## 📂 Project Directory Structure
+
+```text
+zimbank-ai-underwriter/
+├── backend/
+│   ├── data/
+│   │   └── sample_test_data.csv      # Seed data (first 100 records loaded on init)
+│   ├── models/
+│   │   └── final_credit_risk_model.joblib  # Trained machine learning model pipeline
+│   ├── assets/                       # Static logo images & branding assets
+│   ├── main.py                       # FastAPI application & SQLite controller
+│   ├── requirements.txt              # Backend dependencies list
+│   └── README.md                     # Backend API developer documentation
+├── frontend/
+│   ├── src/
+│   │   ├── lib/
+│   │   │   ├── config.ts             # Backend server target URL config
+│   │   │   └── supabase.ts           # Mock Supabase adapter routing to local REST API
+│   │   ├── pages/
+│   │   │   ├── Login.tsx             # White-gradient branding & credential form
+│   │   │   ├── Dashboard.tsx         # Dashboard metrics & batch CSV underwriting
+│   │   │   ├── Customers.tsx         # Searchable customer database
+│   │   │   ├── NewApplication.tsx    # Single application intake form
+│   │   │   └── Underwriting.tsx      # Risk-tier breakdown, trace flags & PDF generation
+│   │   ├── App.tsx                   # Page layout, routing & mock session check
+│   │   ├── main.tsx                  # React DOM entrypoint
+│   │   └── index.css                 # Core CSS design variables & global tokens
+│   ├── package.json                  # Frontend dependencies list
+│   └── vite.config.ts                # Vite config setup
+└── README.md                         # Main workspace project guide (this file)
+```
+
+---
+
+## 🚀 Setup & Installation
+
+### 1. Backend Setup (FastAPI & SQLite)
+
+1.  Navigate to the `backend` directory:
+    ```bash
+    cd backend
+    ```
+2.  Create and activate a virtual environment:
+    ```bash
+    python3 -m venv .venv
+    source .venv/bin/activate
+    ```
+3.  Install dependencies:
+    ```bash
+    pip install -r requirements.txt
+    ```
+4.  Start the FastAPI application:
+    ```bash
+    python main.py
+    ```
+    > [!NOTE]
+    > On startup, `main.py` checks if `zimbank_app.db` exists. If not, it creates the database and seeds it automatically with the first **100 records** from `data/sample_test_data.csv`. The server runs at `http://127.0.0.1:8000`.
+
+### 2. Frontend Setup (React & Vite)
+
+1.  Open a new terminal session and navigate to the `frontend` directory:
+    ```bash
+    cd frontend
+    ```
+2.  Install packages:
+    ```bash
+    npm install
+    ```
+3.  Launch the development server:
+    ```bash
+    npm run dev
+    ```
+    > [!TIP]
+    > The application dev server will be available at `http://localhost:5173`. Make sure the backend server remains active on port `8000` to handle API requests.
+
+---
+
+## 🔑 Login Credentials
+
+The local auth flow is designed for rapid onboarding. You can use **any email and password** containing at least 6 characters.
+
+For standard testing, the following mock credentials can be used:
+*   **Email**: `officer@zimbank.co.zw`
+*   **Password**: `password`
+
+---
+
+## 📜 Underwriting & Policy Rules
+
+The scoring engine categorizes applicants into three primary tiers:
+
+| Default Probability | Risk Tier | Status / Directive |
+| :--- | :--- | :--- |
+| **< 35%** | **Tier A (Low Risk)** | Approved (Auto-pathway enabled) |
+| **35% - 60%** | **Tier B (Medium Risk)** | Under Review (Escalated to Credit Committee) |
+| **> 60%** | **Tier C (High Risk)** | Declined (Over policy limit) |
+
+### Traceability Flags
+*   **DTI Burden**: Triggered if debt-to-income ratio exceeds **45%**.
+*   **LTI Limit**: Triggered if total loan amount exceeds **4.0x** monthly income.
+*   **Stability Risk**: Triggered if time at current employer is less than **12 months**.
+*   **Leverage Warning**: Triggered if existing obligations are present.
+*   **Demographic Burden**: Triggered if number of dependents exceeds **3**.

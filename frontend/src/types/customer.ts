@@ -1,0 +1,35 @@
+export interface Customer {
+  id: string;
+  application_id: string;
+  full_name: string;
+  client_dob: string;
+  province: string;
+  employment_sector: string;
+  months_at_employer: number;
+  monthly_income_usd: number;
+  existing_obligations: number;
+  num_dependents: number;
+  amount_usd: number;
+  annual_rate_pct: number;
+  term_months: number;
+  loan_purpose: string;
+  product_code: string;
+  dti_ratio: number | null;
+  monthly_installment: number | null;
+  total_to_income: number | null;
+  work_stability: number | null;
+  default_probability: number | null;
+  risk_tier: string | null;
+  underwriting_status: string | null;
+  dti_burden_score: number | null;
+  employment_stability_score: number | null;
+  existing_leverage_score: number | null;
+  life_stage_score: number | null;
+  loan_to_income_score: number | null;
+  flag_high_dti: boolean;
+  flag_tenure_instability: boolean;
+  flag_credit_leverage: boolean;
+  flag_demographic_burden: boolean;
+  created_at: string;
+  updated_at: string;
+}
